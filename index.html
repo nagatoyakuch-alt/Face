@@ -1,1 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Rede Social Completa</title>
+<style>
+/* ===== ESTILO GERAL ===== */
+body{margin:0;font-family:Arial,sans-serif;background:#f0f2f5;color:#050505;}
+header{background:#1877f2;color:white;padding:12px 20px;font-size:20px;font-weight:bold;display:flex;align-items:center;}
+header img{width:35px;height:35px;border-radius:50%;margin-right:10px;}
+.page{display:none;padding:15px;margin-bottom:70px;}
+.active{display:block;}
+.card, .post, .story, .message, .comment{background:white;border-radius:10px;padding:10px;margin-bottom:15px;box-shadow:0 1px 2px rgba(0,0,0,0.1);}
+textarea,input{width:100%;border-radius:8px;border:1px solid #ccd0d5;padding:8px;margin-bottom:8px;font-size:14px;}
+button{background:#1877f2;color:white;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:14px;}
+.profile-pic{width:40px;height:40px;border-radius:50%;object-fit:cover;margin-right:8px;}
+.post-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.actions{display:flex;gap:10px;margin-top:8px;}
+.comment{font-size:13px;background:#f0f2f5;padding:6px;margin-top:5px;border-radius:6px;}
+.message{padding:6px;border-radius:8px;background:#f0f2f5;margin-bottom:5px;}
+nav{position:fixed;bottom:0;width:100%;display:flex;justify-content:space-around;background:white;padding:10px;box-shadow:0 -1px 5px rgba(0,0,0,0.1);}
+nav button{background:none;font-size:18px;}
+.story img{width:60px;height:60px;border-radius:50%;margin-right:5px;border:2px solid #1877f2;object-fit:cover;}
+.post img{width:100%;margin-top:8px;border-radius:10px;}
+.notification{background:#ffeb3b;color:#050505;padding:6px;border-radius:6px;margin-bottom:5px;font-size:13px;}
+</style>
+</head>
+<body>
 
+<header><img id="fotoPerfilHeader" src="" alt="Perfil">Rede Social</header>
+
+<!-- LOGIN -->
+<div id="loginPage" class="page active">
+    <h2>Login</h2>
+    <input type="text" id="loginUsuario" placeholder="Usuário">
+    <input type="password" id="loginSenha" placeholder="Senha">
+    <button onclick="login()">Entrar</button>
+    <h3>ou Cadastro</h3>
+    <input type="text" id="cadastroUsuario" placeholder="Novo usuário">
+    <input type="password" id="cadastroSenha" placeholder="Senha">
+    <button onclick="cadastrar()">Cadastrar</button>
+</div>
+
+<!-- FEED -->
+<div id="feedPage" class="page">
+    <div class="card">
+        <textarea id="novoTexto" rows="3" placeholder="No que você está pensando?"></textarea>
+        <input type="file" id="novaImagem" accept="image/*">
+        <button onclick="criarPost()">Publicar</button>
+    </div>
+    <div id="storiesContainer"></div>
+    <div id="feed"></div>
+</div>
+
+<!-- PERFIL -->
+<div id="perfilPage" class="page">
+    <h2 id="perfilNome">@usuario</h2>
+    <img id="fotoPerfil" class="profile-pic" src="" style="width:80px;height:80px;margin-bottom:8px;">
+    <input type="file" accept="image/*" onchange="uploadFoto(event)">
+    <p>Seguidores: <span id="seguidoresCount">0</span></p>
+    <button onclick="toggleSeguir()" id="btnSeguir">Seguir</button>
+    <h3>Lista de Seguidores</h3>
+    <div id="listaSeguidores"></div>
+</div>
+
+<!-- MENSAGENS -->
+<div id="mensagensPage" class="page">
+    <h3>Mensagens Privadas</h3>
+    <div id="chat"></div>
+    <input type="text" id="mensagemInput" placeholder="Digite sua mensagem">
+    <button onclick="enviarMensagem()">Enviar</button>
+</div>
+
+<!-- NOTIFICAÇÕES -->
+<div id="notificacoesPage" class="page">
+    <h3>Notificações</h3>
+    <div id="notificacoes"></div>
+</div>
+
+<!-- MENU -->
+<nav>
+    <button onclick="mudarPagina('feedPage')">🏠 Feed</button>
+    <button onclick="mudarPagina('perfilPage')">👤 Perfil</button>
+    <button onclick="mudarPagina('mensagensPage')">💬 Mensagens</button>
+    <button onclick="mudarPagina('notificacoesPage')">🔔 Notificações</button>
+</nav>
+
+<script>
+// ===== USUÁRIOS =====
+let usuarios = JSON.parse(localStorage.getItem("usuarios")) || [];
+let usuarioAtivo = JSON.parse(localStorage.getItem("usuarioAtivo")) || null;
+
+// ===== LOGIN/CADASTRO =====
+function cadastrar(){
+    const u=document.getElementById("cadastroUsuario").value.trim();
+    const s=document.getElementById("cadastroSenha").value.trim();
+    if(!u||!s){alert("Preencha usuário e senha");return;}
+    if(usuarios.find(x=>x.usuario===u)){alert("Usuário já existe");return;}
+    usuarios.push({usuario:u,senha:s,foto:"",seguidores:[],amigos:[],posts:[],mensagens:[],stories:[]});
+    localStorage.setItem("usuarios",JSON.stringify(usuarios));
+    alert("Cadastro realizado!");
+}
+function login(){
+    const u=document.getElementById("loginUsuario").value.trim();
+    const s=document.getElementById("loginSenha").value.trim();
+    const user=usuarios.find(x=>x.usuario===u && x.senha===s);
+    if(user){usuarioAtivo=user; localStorage.setItem("usuarioAtivo",JSON.stringify(usuarioAtivo)); initApp();}
+    else alert("Usuário ou senha inválidos");
+}
+
+// ===== TROCAR PÁGINA =====
+function mudarPagina(id){
+    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+}
+
+// ===== FOTO PERFIL =====
+function uploadFoto(e){
+    const file=e.target.files[0];
+    const reader=new FileReader();
+    reader.onload=function(){
+        usuarioAtivo.foto=reader.result;
+        salvarUsuarios();
+        document.getElementById("fotoPerfil").src=usuarioAtivo.foto;
+        document.getElementById("fotoPerfilHeader").src=usuarioAtivo.foto;
+        renderFeed();
+    };
+    reader.readAsDataURL(file);
+}
+
+// ===== POSTS =====
+function salvarUsuarios(){localStorage.setItem("usuarios",JSON.stringify(usuarios));localStorage.setItem("usuarioAtivo",JSON.stringify(usuarioAtivo));}
+function criarPost(){
+    const texto=document.getElementById("novoTexto").value;
+    const imagemInput=document.getElementById("novaImagem").files[0];
+    if(!texto.trim()&&!imagemInput)return;
+    const reader=new FileReader();
+    reader.onload=function(){
+        const post={id:Date.now(),texto:texto,imagem:imagemInput?reader.result:null,likes:0,comentarios:[]};
+        usuarioAtivo.posts.unshift(post);
+        salvarUsuarios();
+        renderFeed();
+    };
+    if(imagemInput){reader.readAsDataURL(imagemInput);}else{reader.onload();}
+    document.getElementById("novoTexto").value=""; document.getElementById("novaImagem").value="";
+}
+
+function curtirPost(postId,user){
+    const p=user.posts.find(x=>x.id===postId);
+    p.likes++; salvarUsuarios(); renderFeed();
+}
+function comentarPost(postId,user){
+    const txt=prompt("Comentário:"); if(!txt)return;
+    const p=user.posts.find(x=>x.id===postId);
+    p.comentarios.push(txt); salvarUsuarios(); renderFeed();
+}
+
+// ===== FEED =====
+function renderFeed(){
+    const feed=document.getElementById("feed");
+    feed.innerHTML="";
+    // Mostrar posts de amigos e do próprio usuário
+    const amigosPosts=[usuarioAtivo,...usuarios.filter(u=>usuarioAtivo.amigos.includes(u.usuario))];
+    let todosPosts=[];
+    amigosPosts.forEach(u=>u.posts.forEach(p=>{p.usuario=u; todosPosts.push(p);}));
+    todosPosts.sort((a,b)=>b.id-a.id);
+    todosPosts.forEach(post=>{
+        feed.innerHTML+=`
+        <div class="post">
+            <div class="post-header">
+                <div style="display:flex;align-items:center;">
+                    <img src="${post.usuario.foto||''}" class="profile-pic">
+                    <span>@${post.usuario.usuario}</span>
+                </div>
+                <span>⋮</span>
+            </div>
+            <p>${post.texto}</p>
+            ${post.imagem?`<img src="${post.imagem}">`:''}
+            <div class="actions">
+                <button onclick="curtirPost(${post.id},usuarioAtivo)">❤️ ${post.likes}</button>
+                <button onclick="comentarPost(${post.id},usuarioAtivo)">💬 ${post.comentarios.length}</button>
+            </div>
+            ${post.comentarios.map(c=>`<div class="comment">${c}</div>`).join('')}
+        </div>`;
+    });
+}
+
+// ===== SEGUIDORES/AMIGOS =====
+function toggleSeguir(){
+    const idx=usuarioAtivo.amigos.indexOf("amigoExemplo");
+    if(idx===-1) usuarioAtivo.amigos.push("amigoExemplo");
+    else usuarioAtivo.amigos.splice(idx,1);
+    salvarUsuarios(); renderFeed();
+}
+
+// ===== MENSAGENS =====
+function enviarMensagem(){
+    const txt=document.getElementById("mensagemInput").value; if(!txt.trim())return;
+    usuarioAtivo.mensagens.push({texto:txt,data:new Date().toLocaleTimeString()});
+    salvarUsuarios(); renderChat(); document.getElementById("mensagemInput").value="";
+}
+function renderChat(){
+    const chat=document.getElementById("chat");
+    chat.innerHTML="";
+    usuarioAtivo.mensagens.forEach(m=>{chat.innerHTML+=`<div class="message"><small>${m.data}</small><br>${m.texto}</div>`;});
+}
+
+// ===== STORIES =====
+function renderStories(){
+    const container=document.getElementById("storiesContainer");
+    container.innerHTML="";
+    const allStories=[usuarioAtivo,...usuarios.filter(u=>usuarioAtivo.amigos.includes(u.usuario))];
+    allStories.forEach(u=>{
+        u.stories.forEach(s=>{
+            container.innerHTML+=`<div class="story"><img src="${s}"></div>`;
+        });
+    });
+}
+
+// ===== NOTIFICAÇÕES =====
+function renderNotificacoes(){
+    const cont=document.getElementById("notificacoes");
+    cont.innerHTML="";
+    cont.innerHTML+=usuarioAtivo.mensagens.map(m=>`<div class="notification">Nova mensagem: ${m.texto}</div>`).join('');
+}
+
+// ===== INICIAR APP =====
+function initApp(){
+    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+    document.getElementById("feedPage").classList.add("active");
+    document.getElementById("fotoPerfil").src=usuarioAtivo.foto||'';
+    document.getElementById("fotoPerfilHeader").src=usuarioAtivo.foto||'';
+    renderFeed(); renderChat(); renderStories(); renderNotificacoes();
+}
+
+</script>
+</body>
+</html>
